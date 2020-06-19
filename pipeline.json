@@ -1,0 +1,38 @@
+{
+  "description": "Pipeline for speedtest docs"
+  ,"processors": [
+    {
+      "script": {
+        "lang": "painless"
+        ,"source":
+          """
+          if (ctx.server != null) {
+            if (ctx.server.lat != null && ctx.server.lon != null) {
+              ctx.server["geo"] = [Double.parseDouble(ctx.server.lat), Double.parseDouble(ctx.server.lon)];
+            }
+            ctx.server.remove("cc");
+            ctx.server.remove("d");
+            ctx.server.remove("id");
+            ctx.server.remove("host");
+            ctx.server.remove("latency");
+            ctx.server.remove("lat");
+            ctx.server.remove("lon");
+          }
+          ctx.remove("share");
+          if (ctx.client != null) {
+            if (ctx.client.lat != null && ctx.client.lon != null) {
+              ctx.client["geo"] = [Double.parseDouble(ctx.client.lat), Double.parseDouble(ctx.client.lon)];
+            }
+            ctx.client.remove("isprating");
+            ctx.client.remove("rating");
+            ctx.client.remove("ispdlavg");
+            ctx.client.remove("ispulavg");
+            ctx.client.remove("loggedin");
+            ctx.client.remove("lat");
+            ctx.client.remove("lon");
+          }
+        """
+      }
+    }
+  ]
+}

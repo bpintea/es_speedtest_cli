@@ -1,0 +1,98 @@
+{
+  "index_patterns": [
+    "_INDEX_ALIAS_-*"
+  ],
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1,
+    "index.lifecycle.name": "_ILM_POLICY_NAME_",
+    "index.lifecycle.rollover_alias": "_INDEX_ALIAS_"
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "_source": {
+      "enabled": true
+    },
+    "properties": {
+      "bytes_received": {
+        "type": "long"
+      },
+      "bytes_sent": {
+        "type": "long"
+      },
+      "client": {
+        "properties": {
+          "country": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "ip": {
+            "type": "ip"
+          },
+          "isp": {
+            "type": "keyword",
+            "ignore_above": 256
+          },
+          "geo": {
+            "type": "geo_point"
+          }
+        }
+      },
+      "download": {
+        "type": "float"
+      },
+      "ping": {
+        "type": "float"
+      },
+      "server": {
+        "properties": {
+          "country": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "sponsor": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "url": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "geo": {
+            "type": "geo_point"
+          }
+        }
+      },
+      "timestamp": {
+        "type": "date"
+      },
+      "upload": {
+        "type": "float"
+      }
+    }
+  }
+}
