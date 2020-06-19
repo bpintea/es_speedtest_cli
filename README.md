@@ -48,13 +48,13 @@ These are checked on installation only and expected to be available otherwise.
    entries (`crontab -l`) to find its location and run `uninstall`; below is an
    example that works with the default configuration:
    ```
-   /opt/esst/esst uninstall
+   /opt/esst/bin/esst uninstall
    ```
 
 3. Make a test run
    To produce one measurement, invoke it with the `probe` argument:
    ```
-   /opt/esst/esst probe
+   /opt/esst/bin/esst probe
    ```
 
 ## Kibana Dashboard

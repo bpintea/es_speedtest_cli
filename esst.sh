@@ -92,7 +92,7 @@ function check_deps()
 	if ! $SPEEDTEST --help | grep -q -- --json ; then
 		die "Speedtest under $SPEEDTEST doesn't support JSON output."
 	fi
-	log "Will probe with $(SPEEDTEST --version | grep -v Python)"
+	log "Will probe with: $($SPEEDTEST --version | grep -v Python)"
 
 	check curl
 	check jq
@@ -222,7 +222,7 @@ function which_speedtest()
 
 	if [ -x $SPEEDTEST_BIN_PATH/$SPEEDTEST_BIN_NAME ]; then
 		SPEEDTEST=$SPEEDTEST_BIN_PATH/$SPEEDTEST_BIN_NAME
-	elif [ $(which $SPEEDTEST_BIN_NAME) ]; then
+	elif $(which $SPEEDTEST_BIN_NAME 1>/dev/null) ; then
 		SPEEDTEST=$(which $SPEEDTEST_BIN_NAME)
 	else
 		die "No Speedtest executable found. Neither SPEEDTEST_BIN config"\
@@ -405,7 +405,8 @@ case $1 in
 	"push")
 		do_push
 		;;
-	"*")
+	*)
 		usage
+		;;
 esac
 
