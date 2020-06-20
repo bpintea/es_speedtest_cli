@@ -123,23 +123,35 @@ function setup()
 	trap 'timer "stop"' EXIT
 }
 
+# sets $ANSWER, returns curl's return code
 function c_url()
 {
 	url=$1
 	verb=$2
 	json="$3"
+	json_type=${4:-json}
 
-	answer=$(curl -X $verb $url -u $ES_CREDENTIALS -s -S \
-			-H 'Content-Type: application/json' \
+	ANSWER=$(curl -X $verb $url -u $ES_CREDENTIALS -s -S \
+			-H "Content-Type: application/$json_type" \
 			--data-binary "$json"  )
 	ret_code=$?
 	if [ $ret_code -ne 0 ]; then
-		log "ERROR: curl'ing failed: $answer"
+		log "ERROR: curl'ing failed: $ANSWER"
+		return $ret_code
+	fi
+}
+
+function c_url_ack()
+{
+	c_url $1 $2 "$3"
+	ret_code=$?
+	if [ $ret_code -ne 0 ]; then
 		return $ret_code
 	else
-		ack=$(jq '.acknowledged' <<< $answer)
+		ack=$(jq '.acknowledged' <<< $ANSWER)
 		if [ "$ack" != "true" ]; then
-			log "ERROR: $verb operation failed: $answer"
+			verb=$2
+			log "ERROR: $verb operation failed: $ANSWER"
 			return 1
 		fi
 	fi
@@ -158,7 +170,7 @@ function do_init()
 			sed  -e '/"""/,/"""/{ s/"\([[:alnum:]]\+\)"/\\"\1\\"/ }' \
 				-e 's/"""/"/' | \
 			tr '\n' ' ')
-	c_url $url PUT "$json" || exit $?
+	c_url_ack $url PUT "$json" || exit $?
 
 	#
 	# PUT ILM policy
@@ -167,7 +179,7 @@ function do_init()
 	json=$(cat $CFG_DIR/ilm.json | \
 			sed -e "s/_ROLL_AFTER_/$ES_ILM_ROLL_AFTER/" \
 				-e "s/_DEL_AFTER_/$ES_ILM_DEL_AFTER/")
-	c_url $url PUT "$json" || exit $?
+	c_url_ack $url PUT "$json" || exit $?
 
 	#
 	# PUT template
@@ -176,14 +188,14 @@ function do_init()
 	json=$(cat $CFG_DIR/template.json | \
 			sed -e "s/_INDEX_ALIAS_/$ES_ALIAS_NAME/" \
 				-e "s/_ILM_POLICY_NAME_/$ES_ILM_POLICY_NAME/")
-	c_url $url PUT "$json" || exit $?
+	c_url_ack $url PUT "$json" || exit $?
 
 	#
 	# PUT ILM bootstrapping index
 	#
 	url=$ES_HOST_URL/$ES_ALIAS_NAME-$CNT_START
 	json="{\"aliases\": {\"$ES_ALIAS_NAME\": {\"is_write_index\": true}}}"
-	c_url $url PUT "$json" || exit $?
+	c_url_ack $url PUT "$json" || exit $?
 }
 
 function do_drop()
@@ -195,25 +207,25 @@ function do_drop()
 	# DELETE pipeline
 	#
 	url=$ES_HOST_URL/_ingest/pipeline/$ES_PIPELINE_NAME
-	c_url $url DELETE || echo "Deleting pipeline $ES_PIPELINE_NAME failed"
+	c_url_ack $url DELETE || echo "Deleting pipeline $ES_PIPELINE_NAME failed"
 
 	#
 	# DELETE template
 	#
 	url=$ES_HOST_URL/_template/$ES_TEMPLATE_NAME
-	c_url $url DELETE || echo "Deleting template $ES_TEMPLATE_NAME failed"
+	c_url_ack $url DELETE || echo "Deleting template $ES_TEMPLATE_NAME failed"
 
 	#
 	# DELETE indices
 	#
 	url=$ES_HOST_URL/$ES_ALIAS_NAME*
-	c_url $url DELETE || echo "Deleting aliases $ES_ALIAS_NAME* failed"
+	c_url_ack $url DELETE || echo "Deleting aliases $ES_ALIAS_NAME* failed"
 
 	#
 	# DELETE ILM policy
 	#
 	url=$ES_HOST_URL/_ilm/policy/$ES_ILM_POLICY_NAME
-	c_url $url DELETE || echo "Deleting ILM policy $ES_ILM_POLICY_NAME failed"
+	c_url_ack $url DELETE || echo "Deleting ILM policy $ES_ILM_POLICY_NAME failed"
 }
 
 function which_speedtest()
@@ -222,7 +234,7 @@ function which_speedtest()
 
 	if [ -x $SPEEDTEST_BIN_PATH/$SPEEDTEST_BIN_NAME ]; then
 		SPEEDTEST=$SPEEDTEST_BIN_PATH/$SPEEDTEST_BIN_NAME
-	elif $(which $SPEEDTEST_BIN_NAME 1>/dev/null) ; then
+	elif which $SPEEDTEST_BIN_NAME 1>/dev/null ; then
 		SPEEDTEST=$(which $SPEEDTEST_BIN_NAME)
 	else
 		die "No Speedtest executable found. Neither SPEEDTEST_BIN config"\
@@ -267,23 +279,19 @@ function do_push()
 	fi
 
 	url=$ES_HOST_URL/_bulk?pipeline=$ES_PIPELINE_NAME
-	answer=$(curl -X POST $url -u $ES_CREDENTIALS -s -S \
-			-H 'Content-Type: application/x-ndjson' \
-			--data-binary "@$temp_dir/$LOG_SPOOL")
-	ret_code=$?
+	c_url $url POST "@$temp_dir/$LOG_SPOOL" x-ndjson
 
-	if [ $ret_code -ne 0 ]; then
-		log "upload failed: $answer"
-		exit $ret_code
+	if [ $? -eq 0 ]; then
+		errors=$(jq '.errors' <<< $ANSWER)
+		if [ "$errors" != "false" ]; then
+			log "ERROR: ingesting failure(s); server ANSWER: '$ANSWER'."
+			cat $temp_dir/$LOG_SPOOL >> $temp_dir/$LOG_FAILURES
+			echo $ANSWER >> $temp_dir/$LOG_FAILURES
+		fi
+		rm $temp_dir/$LOG_SPOOL
+	else
+		return 1
 	fi
-
-	errors=$(jq '.errors' <<< $answer)
-	if [ "$errors" != "false" ]; then
-		log "ERROR: ingesting failure(s); server answer: '$answer'."
-		cat $temp_dir/$LOG_SPOOL >> $temp_dir/$LOG_FAILURES
-		echo $answer >> $temp_dir/$LOG_FAILURES
-	fi
-	rm $temp_dir/$LOG_SPOOL
 }
 
 function do_install_files()
