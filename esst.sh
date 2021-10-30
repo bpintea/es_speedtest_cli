@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#Copyright (c) 2020 bpintea
+#Copyright (c) 2021 bpintea
 #
 #Permission is hereby granted, free of charge, to any person obtaining a copy
 #of this software and associated documentation files (the "Software"), to deal
@@ -244,6 +244,7 @@ function which_speedtest()
 
 function do_speedtest()
 {
+	set +e
 	setup
 	log "Probing started."
 
@@ -254,14 +255,19 @@ function do_speedtest()
 	which_speedtest
 
 	st_args="--json $SPEEDTEST_ARGS"
-	output=$($SPEEDTEST $st_args > $log_file)
+	$SPEEDTEST $st_args >$log_file 2>&1
 	ret_code=$?
+	# speedtest can fail and still return 0
 	if [ $ret_code -eq 0 ]; then
+		download=$(cat $log_file | jq .download)
+		ret_code=$?
+	fi
+	if [ $ret_code -eq 0 ] && [ ! -z "$download" ]; then
 		echo "{\"index\": {\"_index\" : \"$ES_ALIAS_NAME\"}}" >> \
 			$temp_dir/$LOG_SPOOL
 		cat $log_file >> $temp_dir/$LOG_SPOOL && rm $log_file
 	else
-		log "probing failed: $output"
+		log "probing failed: $(cat $log_file)"
 		exit $ret_code
 	fi
 }
